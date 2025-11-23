@@ -1,108 +1,189 @@
-# Desafio Detective Quest - Estruturas de Dados e Investigação
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
-Bem-vindo ao desafio **Detective Quest**! Neste jogo de mistério, o jogador explora uma mansão, encontra pistas e relaciona evidências a suspeitos. Para tornar isso possível, você atuará como programador responsável por implementar toda a lógica de estruturas de dados do jogo.
+typedef struct Sala {
+    char *nome;
+    struct Sala *esq;
+    struct Sala *dir;
+} Sala;
 
-A **Enigma Studios**, especializada em jogos educacionais, contratou você para criar a base de funcionamento da mansão e das investigações usando **árvore binária**, **árvore de busca** e **tabela hash**.
+/**
+ * criarSala(nome)
+ * Cria dinamicamente uma sala (nó da árvore) copiando o nome.
+ * Retorna ponteiro para a Sala criada ou NULL se falhar.
+ */
+Sala *criarSala(const char *nome) {
+    Sala *s = (Sala *) malloc(sizeof(Sala));
+    if (!s) {
+        fprintf(stderr, "Erro: falha ao alocar memória para Sala.\n");
+        return NULL;
+    }
+    size_t len = strlen(nome) + 1;
+    s->nome = (char *) malloc(len);
+    if (!s->nome) {
+        fprintf(stderr, "Erro: falha ao alocar memória para nome da sala.\n");
+        free(s);
+        return NULL;
+    }
+    memcpy(s->nome, nome, len);
+    s->esq = s->dir = NULL;
+    return s;
+}
 
-O desafio está dividido em três níveis: **Novato**, **Aventureiro** e **Mestre**, com cada nível adicionando mais complexidade ao anterior.  
-**Você deve escolher qual desafio deseja realizar.**
+/**
+ * liberarSalas(raiz)
+ * Libera recursivamente a memória usada pela árvore.
+ */
+void liberarSalas(Sala *raiz) {
+    if (!raiz) return;
+    liberarSalas(raiz->esq);
+    liberarSalas(raiz->dir);
+    free(raiz->nome);
+    free(raiz);
+}
 
-🚨 **Atenção:** O nível Novato foca apenas na árvore binária de navegação de cômodos. Ideal para começar com estruturas básicas.
+/**
+ * explorarSalas(inicio)
+ * Permite a navegação interativa pela mansão a partir da sala 'inicio'.
+ * O jogador escolhe 'e' (esquerda), 'd' (direita) ou 's' (sair).
+ * Exibe as salas visitadas durante a exploração.
+ */
+void explorarSalas(Sala *inicio) {
+    if (!inicio) {
+        printf("Mapa vazio. Nada a explorar.\n");
+        return;
+    }
 
----
+    // vetor simples para guardar o percurso (apenas ponteiros para nomes).
+    const char **visitadas = NULL;
+    size_t cap = 0, n = 0;
 
-## 🎮 Nível Novato: Mapa da Mansão com Árvore Binária
+    Sala *atual = inicio;
+    char buf[64];
 
-No nível Novato, você criará a árvore binária que representa o **mapa da mansão**. Cada sala é um nó, e o jogador poderá explorar os caminhos à esquerda ou à direita, começando pelo "Hall de Entrada".
+    while (1) {
+        // registrar visita
+        if (n + 1 > cap) {
+            size_t nova = (cap == 0) ? 4 : cap * 2;
+            const char **tmp = realloc(visitadas, nova * sizeof(const char *));
+            if (!tmp) {
+                fprintf(stderr, "Erro: falha ao alocar memória para histórico de visitas.\n");
+                break;
+            }
+            visitadas = tmp;
+            cap = nova;
+        }
+        visitadas[n++] = atual->nome;
 
-🚩 **Objetivo:** Criar um programa em C que:
+        // exibe sala atual
+        printf("\nVocê está na sala: %s\n", atual->nome);
 
-- Construa dinamicamente uma árvore binária representando os cômodos.
-- Permita que o jogador explore a mansão interativamente (esquerda, direita).
-- Exiba o nome de cada cômodo visitado até alcançar um nó-folha (fim do caminho).
+        // checar se é folha
+        int temEsq = (atual->esq != NULL);
+        int temDir = (atual->dir != NULL);
+        if (!temEsq && !temDir) {
+            printf("Esta sala não possui caminhos. Fim da exploração.\n");
+            break;
+        }
 
-⚙️ **Funcionalidades do Sistema:**
+        // mostrar opções disponíveis
+        printf("Escolha um caminho:\n");
+        if (temEsq) printf("  (e) esquerda\n");
+        if (temDir) printf("  (d) direita\n");
+        printf("  (s) sair da exploração\n");
+        printf("Opção: ");
 
-- A árvore é criada automaticamente via `main()` com `criarSala()`.
-- O jogador interage com o jogo usando `explorarSalas()`, escolhendo entre:
-  - `e` → ir para a esquerda
-  - `d` → ir para a direita
-  - `s` → sair da exploração
+        // ler entrada
+        if (!fgets(buf, sizeof(buf), stdin)) {
+            // EOF ou erro
+            printf("\nEntrada interrompida. Saindo.\n");
+            break;
+        }
 
-📥 **Entrada** e 📤 **Saída de Dados:**
+        // pegar primeiro caractere não-espaco
+        char escolha = '\0';
+        for (size_t i = 0; buf[i] != '\0'; ++i) {
+            if (!isspace((unsigned char)buf[i])) {
+                escolha = tolower((unsigned char)buf[i]);
+                break;
+            }
+        }
 
-*   O usuário navega pela mansão com base nas opções exibidas no terminal.
-*   O programa mostra o nome da sala visitada a cada passo.
+        if (escolha == 's') {
+            printf("Você escolheu sair da exploração.\n");
+            break;
+        } else if (escolha == 'e') {
+            if (temEsq) {
+                atual = atual->esq;
+                continue;
+            } else {
+                printf("Caminho à esquerda não disponível. Escolha outra opção.\n");
+                continue;
+            }
+        } else if (escolha == 'd') {
+            if (temDir) {
+                atual = atual->dir;
+                continue;
+            } else {
+                printf("Caminho à direita não disponível. Escolha outra opção.\n");
+                continue;
+            }
+        } else {
+            printf("Opção inválida. Use 'e', 'd' ou 's'.\n");
+            continue;
+        }
+    }
 
-**Simplificações para o Nível Novato:**
+    // Mostrar lista completa de salas visitadas
+    if (n > 0) {
+        printf("\nSalas visitadas (em ordem de visita):\n");
+        for (size_t i = 0; i < n; ++i) {
+            printf("  %zu. %s\n", i + 1, visitadas[i]);
+        }
+    } else {
+        printf("\nNenhuma sala visitada.\n");
+    }
 
-*   Apenas árvore binária (sem inserção ou remoção durante o jogo).
-*   A árvore é montada estaticamente via código.
-*   Estrutura imutável em tempo de execução.
+    free(visitadas);
+}
 
----
+int main(void) {
+    // Montagem manual do mapa (árvore binária)
+    // Hall de entrada é a raiz
+    Sala *hall = criarSala("Hall de entrada");
 
-## 🛡️ Nível Aventureiro: Organização de Pistas com Árvore de Busca
+    // nível 1
+    Sala *salaEstar = criarSala("Sala de estar");
+    Sala *corredor = criarSala("Corredor");
 
-No nível Aventureiro, você expandirá o jogo incluindo uma **árvore de busca (BST)** para armazenar pistas encontradas.
+    hall->esq = salaEstar;
+    hall->dir = corredor;
 
-🆕 **Diferença em relação ao Nível Novato:**
+    // nível 2 - salaEstar
+    Sala *cozinha = criarSala("Cozinha");
+    Sala *biblioteca = criarSala("Biblioteca");
+    salaEstar->esq = cozinha;
+    salaEstar->dir = biblioteca;
 
-*   Agora, ao visitar certos cômodos, o jogador encontrará pistas.
-*   Essas pistas são armazenadas ordenadamente em uma BST.
+    // nível 2 - corredor
+    Sala *quarto = criarSala("Quarto");
+    Sala *jardim = criarSala("Jardim");
+    corredor->esq = quarto;
+    corredor->dir = jardim;
 
-⚙️ **Funcionalidades do Sistema:**
+    // folhas podem ter NULLs (já estão assim). Ex. cozinha, biblioteca, quarto, jardim são folhas.
 
-*   Implementar inserção e busca de strings (pistas) na árvore de busca.
-*   Permitir que o jogador visualize todas as pistas em ordem alfabética.
-*   Adicionar novas pistas automaticamente ao visitar salas específicas.
+    printf("=== Detective Quest: Exploração da Mansão ===\n");
+    printf("Iniciando a exploração a partir do Hall de entrada.\n");
+    printf("Navegue com: 'e' = esquerda, 'd' = direita, 's' = sair.\n");
 
-📥 **Entrada** e 📤 **Saída de Dados:**
+    explorarSalas(hall);
 
-*   As pistas são cadastradas via `inserir()` ao serem encontradas.
-*   O programa pode listar todas as pistas com `emOrdem()`.
+    // liberar memória
+    liberarSalas(hall);
 
-**Simplificações para o Nível Intermediário:**
-
-*   Nenhuma remoção é necessária.
-*   Não é necessário balancear a árvore.
-*   As pistas são strings simples (nomes curtos).
-
----
-
-## 🏆 Nível Mestre: Suspeitos e Solução com Tabela Hash
-
-No nível Mestre, você implementará a **tabela hash** para vincular pistas a **suspeitos**. Agora o jogador pode consultar quem está associado a cada pista e deduzir o culpado com base nas evidências coletadas.
-
-🆕 **Diferença em relação ao Nível Aventureiro:**
-
-*   Cada pista armazenada na BST será relacionada a um suspeito via tabela hash.
-*   Ao final, o jogador poderá ver qual suspeito está mais associado às pistas e decidir quem é o culpado.
-
-⚙️ **Funcionalidades do Sistema:**
-
-*   Implementar uma tabela hash (array de ponteiros ou lista encadeada).
-*   Função de inserção que relaciona pista → suspeito.
-*   Permitir consulta de todas as pistas relacionadas a cada suspeito.
-*   Mostrar o “suspeito mais citado” ao final da análise.
-
-📥 **Entrada** e 📤 **Saída de Dados:**
-
-*   As pistas e suspeitos são armazenados via `inserirNaHash(pista, suspeito)`.
-*   O programa exibe as associações pista → suspeito.
-*   Exibe o suspeito mais citado com base nas pistas armazenadas.
-
-**Observações:**
-
-*   Pode utilizar hashing simples com função de espalhamento baseada em primeiros caracteres ou soma ASCII.
-*   O ideal é evitar colisões, mas, se ocorrerem, use encadeamento.
-
----
-
-## 🏁 Conclusão
-
-Ao concluir qualquer um dos níveis, você terá desenvolvido um sistema de investigação funcional em C, utilizando estruturas fundamentais como árvores e tabelas hash para controlar lógica de jogo.
-
-Boa sorte, e divirta-se programando com **Detective Quest**!
-
-Equipe de Ensino – Enigma Studios
+    printf("\nExploração encerrada. Obrigado por jogar (teste de console).\n");
+    return 0;
+}
